@@ -107,6 +107,11 @@
   `GroupTitle` and `Tags` . This feature has been added in order to support
   grouping and filtering of datasets in UIs, 
   see https://github.com/xcube-dev/xcube-viewer/issues/385.
+
+* xcube server can now be configured to produce structured data logs.
+  If `data_logging` is `true` server requests are logged in form of
+  JSON data records, that can be machine-detected and -parsed by lines 
+  starting with a `{` character. (#1060)
   
 * Added server endpoint `GET /statistics/{varName}` with query parameters 
   `lon`, `lat`, `time` which is used to extract single point data. 

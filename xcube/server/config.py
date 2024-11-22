@@ -34,6 +34,9 @@ BASE_SERVER_CONFIG_SCHEMA = JsonObjectSchema(
             " returned by server responses."
             " Can be an absolute URL or a relative URL path.",
         ),
+        data_logging=JsonBooleanSchema(
+            title="Log JSON data records instead of human-readable message logs."
+        ),
         trace_perf=JsonBooleanSchema(
             title="Output performance measures",
         ),

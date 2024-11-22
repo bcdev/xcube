@@ -8,9 +8,6 @@ from typing import (
     Callable,
     Any,
     Union,
-    Tuple,
-    Type,
-    Dict,
 )
 from collections.abc import Sequence, Awaitable
 
@@ -83,6 +80,38 @@ class TornadoFrameworkTest(unittest.TestCase):
         self.assertEqual(1, self.application.listen_count)
         self.assertEqual(1, self.io_loop.start_count)
         self.assertEqual(1, self.io_loop.stop_count)
+
+    def test_data_logging_disabled_by_default(self):
+        server = mock_server(framework=self.framework, config={})
+        self.framework.start(server.ctx)
+        self.assertNotIn("log_function", self.application.settings)
+        self.framework.stop(server.ctx)
+
+    def test_enable_data_logging(self):
+        server = mock_server(framework=self.framework, config={"data_logging": True})
+        self.framework.start(server.ctx)
+        self.assertIn("log_function", self.application.settings)
+        log_function = self.application.settings["log_function"]
+        self.assertTrue(callable(log_function))
+
+        class DatasetsHandler(tornado.web.RequestHandler):
+            def get(self):
+                return {}
+
+        # noinspection PyTypeChecker
+        handler = DatasetsHandler(
+            self.application,
+            tornado.httputil.HTTPServerRequest(
+                method="GET", uri="/datasets", connection=MockConnection()
+            ),
+        )
+
+        # For time being, smoke test only, logging is side effect.
+        # Check if we can return data record from log_function(),
+        # and verify fields are as expected.
+        log_function(handler)
+
+        self.framework.stop(server.ctx)
 
     def test_async_exec(self):
         def my_func(a, b):
@@ -158,13 +187,15 @@ class TornadoFrameworkTest(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             p2p("/datasets/{dataset_id")
         self.assertEqual(
-            'missing closing "}" in "/datasets/{dataset_id"', f"{cm.exception}",
+            'missing closing "}" in "/datasets/{dataset_id"',
+            f"{cm.exception}",
         )
 
         with self.assertRaises(ValueError) as cm:
             p2p("/datasets/dataset_id}/bbox")
         self.assertEqual(
-            'missing opening "{" in "/datasets/dataset_id}/bbox"', f"{cm.exception}",
+            'missing opening "{" in "/datasets/dataset_id}/bbox"',
+            f"{cm.exception}",
         )
 
         with self.assertRaises(ValueError) as cm:
@@ -421,6 +452,9 @@ class MockIOLoop:
 class MockApplication:
     def __init__(self):
         self.handlers = []
+        self.settings = {}
+        self.ui_modules = {}
+        self.ui_methods = {}
         self.listen_count = 0
 
     # noinspection PyUnusedLocal

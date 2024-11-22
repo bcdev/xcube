@@ -201,6 +201,12 @@ class ServerTest(unittest.TestCase):
                         "additionalProperties": False,
                     },
                 },
+                "data_logging": {
+                    "type": "boolean",
+                    "title": (
+                        "Log JSON data records instead of human-readable message logs."
+                    ),
+                },
                 "trace_perf": {
                     "type": "boolean",
                     "title": "Output performance measures",

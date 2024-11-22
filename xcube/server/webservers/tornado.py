@@ -4,11 +4,13 @@
 
 import asyncio
 import concurrent.futures
+import datetime
 import functools
+import json
 import logging
 import traceback
 import urllib.parse
-from typing import Any, Optional, Union, Callable, Type
+from typing import Any, Optional, Union, Callable
 from collections.abc import Sequence, Awaitable, Mapping
 
 import tornado.escape
@@ -124,16 +126,18 @@ class TornadoFramework(Framework):
         handlers = []
 
         for api_route in api_routes:
-            handlers.append((
-                url_prefix + self.path_to_pattern(api_route.path)
-                + ("/?" if api_route.slash else ""),
-                TornadoRequestHandler,
-                {"api_route": api_route},
-            ))
+            handlers.append(
+                (
+                    url_prefix
+                    + self.path_to_pattern(api_route.path)
+                    + ("/?" if api_route.slash else ""),
+                    TornadoRequestHandler,
+                    {"api_route": api_route},
+                )
+            )
             LOG.log(
                 LOG_LEVEL_DETAIL,
-                f"Added route {api_route.path!r}"
-                f" from API {api_route.api_name!r}",
+                f"Added route {api_route.path!r}" f" from API {api_route.api_name!r}",
             )
 
         if handlers:
@@ -149,6 +153,14 @@ class TornadoFramework(Framework):
         address = config["address"]
         url_prefix = get_url_prefix(config)
         tornado_settings = config.get("tornado", {})
+
+        if config.get("data_logging"):
+            # Reset formatters to just output the message (= JSON data record)
+            for h in logging.getLogger().handlers:
+                if isinstance(h, logging.StreamHandler):
+                    h.setFormatter(logging.Formatter("%(message)s"))
+
+            self.application.settings["log_function"] = _get_data_log_function(ctx)
 
         self.application.listen(port, address=address, **tornado_settings)
 
@@ -474,3 +486,63 @@ class TornadoApiResponse(ApiResponse):
     ):
         self.write(data, content_type)
         return self._handler.finish()
+
+
+# noinspection PyUnusedLocal
+def _get_data_log_function(ctx: Context):
+    """Get a logging function that outputs JSON records.
+
+    Args:
+        ctx: Application context.
+
+    Returns:
+        A Tornado log function.
+    """
+
+    # Closure here, because we may want to include
+    # auth info from context later
+    def log_function(handler: tornado.web.RequestHandler):
+        request = handler.request
+        status = handler.get_status()
+
+        if status < 400:
+            level = "INFO"
+        elif status < 500:
+            level = "WARNING"
+        else:
+            level = "ERROR"
+
+        duration = round(1000.0 * request.request_time())
+
+        # will not be set yet
+        user_id = (
+            f"{handler.current_user}" if handler.current_user is not None else None
+        )
+
+        data = {
+            "timestamp": str(datetime.datetime.utcnow()),
+            "level": level,
+            "status": status,
+            "user_id": user_id,
+            "duration": duration,  # milliseconds
+            "request": {
+                "method": request.method,
+                "uri": request.uri,
+                "host": request.host,
+                "protocol": request.protocol,
+                "remote_ip": request.remote_ip,
+                "user_agent": request.headers.get("User-Agent"),
+            },
+        }
+
+        LOG.log(getattr(logging, level), DataLogMessage(data))
+
+    return log_function
+
+
+class DataLogMessage:
+    def __init__(self, data: dict[str, Any]):
+        self.data = data
+
+    def __str__(self):
+        return json.dumps(self.data)
