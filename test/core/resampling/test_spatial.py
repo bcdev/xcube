@@ -108,7 +108,7 @@ class ResampleInSpaceTest(SourceDatasetMixin, unittest.TestCase):
             ),
         )
 
-        # 1/2 resolution
+        # 1/2 resolution, test if subset calculation works as expected
         target_gm = GridMapping.regular(
             size=(5, 5), xy_min=(9.9886, 53.5499), xy_res=0.0003, crs=CRS_WGS84
         )
