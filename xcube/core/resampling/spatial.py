@@ -214,5 +214,8 @@ def resample_in_space(
         source_gm=transformed_source_gm,
         ref_ds=ref_ds,
         target_gm=target_gm,
+        var_configs=var_configs,
+        encode_cf=encode_cf,
         gm_name=gm_name,
+        rectify_kwargs=rectify_kwargs,
     )

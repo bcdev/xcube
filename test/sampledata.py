@@ -4,6 +4,7 @@
 
 import numpy as np
 import pandas as pd
+import pyproj
 import xarray as xr
 
 
@@ -367,6 +368,19 @@ class SourceDatasetMixin:
                 rad=xr.DataArray(rad, dims=("y", "x")),
             )
         )
+
+    @classmethod
+    def new_5x5_dataset_regular_utm(cls):
+        x = np.arange(565300.0, 565800.0, 100.0)
+        y = np.arange(5934300.0, 5933800.0, -100.0)
+        spatial_ref = np.array(0)
+        band_1 = np.arange(25).reshape((5, 5))
+        ds = xr.Dataset(
+            dict(band_1=xr.DataArray(band_1, dims=("y", "x"))),
+            coords=dict(x=x, y=y, spatial_ref=spatial_ref),
+        )
+        ds.spatial_ref.attrs = pyproj.CRS.from_epsg("32632").to_cf()
+        return ds
 
     @classmethod
     def new_2x2_dataset_with_irregular_coords_antimeridian(cls):
