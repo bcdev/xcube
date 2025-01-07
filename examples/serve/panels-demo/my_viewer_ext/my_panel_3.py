@@ -6,7 +6,7 @@ import shapely
 import shapely.ops
 
 from chartlets import Component, Input, State, Output
-from chartlets.components import Box, Button, CircularProgress, Plot, Select, Typography
+from chartlets.components import Box, Button, Typography, VegaChart
 
 from xcube.webapi.viewer.contrib import Panel, get_dataset
 from xcube.webapi.viewer.contrib import get_datasets_ctx
@@ -25,19 +25,29 @@ panel = Panel(__name__, title="Spectral")
     ),
     State("@app", "selectedTimeLabel"),
     State("@app", "selectedPlaceGeometry"),
+    State("@app", "selectedPlaceId"),
     State("@app", "selectedVariableName"),
+    State("@app", "themeMode"),
+    State("@app", "selectedPlaceGroup"),
 )
 def render_panel(
     ctx: Context,
     dataset_id: str,
     time_label: float,
     place_geometry: dict[str, Any],
+    place_id: str,
     variable_name: str,
+    theme_mode: str,
+    placegroup: str,
 ) -> Component:
 
+    print("######################")
+    print(placegroup)
+    print("######################")
     dataset = get_dataset(ctx, dataset_id)
 
-    plot = Plot(id="plot", chart=None, style={"paddingTop": 6})
+    # plot = Plot(id="plot", chart=None, style={"paddingTop": 6}, theme="dark")
+    plot = VegaChart(id="plot", chart=None, style={"paddingTop": 6})  # , theme="dark")
 
     ds_ctx = get_datasets_ctx(ctx)
     ds_configs = ds_ctx.get_dataset_configs()
@@ -46,7 +56,8 @@ def render_panel(
         f"{ds_configs[0]['Title']} "
         f"/ {time_label[0:-1]} / "
         f"{round(place_geometry['coordinates'][0], 3)}, {round(place_geometry['coordinates'][1], 3)} / "
-        f"{variable_name}"
+        f"{variable_name} /  "
+        f"{place_id}"
         #   f"{dataset}______________ "
         #   f"{dataset.variables}_______________"
         #   f"{dataset.data_vars}"
@@ -92,25 +103,36 @@ def get_wavelength(
     place_geometry: dict[str, Any],
 ) -> pd.DataFrame:
 
-    grid_mapping = GridMapping.from_dataset(dataset)
-    place_geometry = normalize_geometry(place_geometry)
-    if place_geometry is not None and not grid_mapping.crs.is_geographic:
-        project = pyproj.Transformer.from_crs(
-            CRS_CRS84, grid_mapping.crs, always_xy=True
-        ).transform
-        place_geometry = shapely.ops.transform(project, place_geometry)
-
-    dataset = mask_dataset_by_geometry(dataset, place_geometry)
-    if dataset is None:
-        # TODO: set error message in panel UI
-        print("dataset is None after masking, invalid geometry?")
-        return None
-
     if "time" in dataset.coords:
         if time_label:
             dataset = dataset.sel(time=pd.Timestamp(time_label[0:-1]), method="nearest")
         else:
             dataset = dataset.isel(time=-1)
+
+    grid_mapping = GridMapping.from_dataset(dataset)
+
+    place_geometry = normalize_geometry(place_geometry)
+    if place_geometry is not None and not grid_mapping.crs.is_geographic:
+
+        project = pyproj.Transformer.from_crs(
+            CRS_CRS84, grid_mapping.crs, always_xy=True
+        ).transform
+        place_geometry = shapely.ops.transform(project, place_geometry)
+
+    # TODO: Error, find no gridmapping
+
+    #  dataset = mask_dataset_by_geometry(dataset, place_geometry)
+    if dataset is None:
+        # TODO: set error message in panel UI
+        print("dataset is None after masking, invalid geometry?")
+        return None
+
+    # TODO before that - use mask_by_geometry
+    dataset = dataset.sel(
+        y=place_geometry.y,
+        x=place_geometry.x,
+        method="nearest",
+    )
 
     variables = []
     wavelengths = []
@@ -119,48 +141,46 @@ def get_wavelength(
             wavelengths.append(var.attrs["wavelength"])
             variables.append(var_name)
 
-    source = []
+    result = []
     for var in variables:
-        value = dataset[var].item()
-        source.append({"variable": var, "reflectance": value})
+        value = dataset[var].values.item()
+        result.append({"variable": var, "reflectance": value})
 
-    results_df = pd.DataFrame(source)
-    results_df["wavelength"] = wavelengths
-    return results_df
-
-    # import random
-    # #reflectances = range(len(wavelengths))
-    # reflectances = [random.uniform(min(wavelengths), max(wavelengths)) for _ in
-    #                  range(len(wavelengths))]
-    #
-    # source = pd.DataFrame(
-    #     {'wavelength': wavelengths, 'reflectance': reflectances}
-    # )
-    # return source
+    result = pd.DataFrame(result)
+    result["wavelength"] = wavelengths
+    return result
 
 
 @panel.callback(
     State("@app", "selectedDatasetId"),
     State("@app", "selectedTimeLabel"),
     State("@app", "selectedPlaceGeometry"),
+    State("@app", "selectedPlaceGroup"),
     Input("button", "clicked"),
     Output("plot", "chart"),
 )
 def update_plot(
     ctx: Context,
-    dataset_id: str | None = None,
-    time_label: float | None = None,
-    place_geometry: dict[str, Any] | None = None,
+    dataset_id: str,
+    time_label: float,
+    place_geometry: dict[str, Any],
+    placegroup: str,
     _clicked: bool | None = None,  # trigger, will always be True
 ) -> alt.Chart | None:
     dataset = get_dataset(ctx, dataset_id)
 
+    print("######################")
+    print(placegroup)
+    print("######################")
     source = get_wavelength(dataset, time_label, place_geometry)
     # source = pd.DataFrame(
     # {'wavelength': [1, 2, 3, 4], 'reflectance': [1, 2, 3, 4]}
     # )
 
-    # TODO - message if source==None
+    if source is None:
+        # TODO: set error message in panel UI
+        print("No reflectances found in Variables")
+        return None
 
     chart = (
         alt.Chart(source)
@@ -169,8 +189,10 @@ def update_plot(
             x="wavelength",
             y="reflectance",
             # color=alt.Color("reflectance"),
-            tooltip=["wavelength", "reflectance"],  # ,'variable'
+            tooltip=["variable", "wavelength", "reflectance"],
         )
-    ).properties(title="Spectral Chart", width=360, height=160)
+    ).properties(
+        width=360, height=160
+    )  # title="Spectral Chart",
 
     return chart
