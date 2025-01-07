@@ -38,9 +38,10 @@ dependencies:
   - s3fs >=2021.6
   - setuptools >=41.0
   - shapely >=1.6
+  - tabulate >=0.9
   - tornado >=6.0
   - urllib3 >=1.26
-  - xarray >=2022.6
+  - xarray >=2024.7
   - zarr >=2.11
   # Chartlets
   - altair

@@ -3,7 +3,7 @@
 # https://opensource.org/licenses/MIT.
 
 from abc import abstractmethod, ABC
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 import xarray as xr
 
@@ -15,6 +15,7 @@ from xcube.util.extension import ExtensionPredicate
 from xcube.util.extension import ExtensionRegistry
 from xcube.util.jsonschema import JsonObjectSchema
 from xcube.util.plugin import get_extension_registry
+from .preload import PreloadHandle
 from .datatype import DataType
 from .datatype import DataTypeLike
 from .error import DataStoreError
@@ -128,7 +129,7 @@ def find_data_writer_extensions(
 def get_data_accessor_predicate(
     data_type: DataTypeLike = None, format_id: str = None, storage_id: str = None
 ) -> ExtensionPredicate:
-    """Get a predicate that checks if a data accessor extensions's name is
+    """Get a predicate that checks if the name of a data accessor extension is
     compliant with *data_type*, *format_id*, *storage_id*.
 
     Args:
@@ -171,7 +172,7 @@ def get_data_accessor_predicate(
 
 
 #######################################################
-# Classes
+# Interface Classes
 #######################################################
 
 
@@ -224,6 +225,21 @@ class DataOpener(ABC):
         Raises:
             DataStoreError: If an error occurs.
         """
+
+    def close(self):
+        """Closes this data opener.
+
+        Should be called if the data opener is no longer needed.
+
+        This method may close local files, remote connections, or release
+        allocated resources.
+
+        The default implementation does nothing.
+        """
+
+    def __del__(self):
+        """Overridden to call ``close()``."""
+        self.close()
 
 
 class DataDeleter(ABC):
@@ -304,6 +320,70 @@ class DataWriter(DataDeleter, ABC):
 
         Raises:
             DataStoreError: If an error occurs.
+        """
+
+
+class DataPreloader(ABC):
+    """An interface that specifies a parameterized `preload_data()` operation.
+
+    Warning: This is an experimental and potentially unstable API
+    introduced in xcube 1.8.
+
+    Many data store implementations rely on remote data APIs.
+    Such API may provide only limited data access performance.
+    Hence, the approach taken by ``DataStore.open_data(data_id, ...)`` alone
+    is suboptimal for a user's perspective. This is because the method is
+    blocking as it is not asynchronous, it may take long time before it
+    returns, and it cannot report any progress while doing so.
+    The reasons for slow and unresponsive data APIs are manifold: intended
+    access is by file download, access is bandwidth limited, or not allowing
+    for sub-setting.
+
+Data stores may implement the ``preload_data()`` method differently—or not at all.
+In most cases, if preloading is required, the data will be downloaded and stored
+temporarily in a cache for access.
+    """
+
+    @abstractmethod
+    def preload_data(
+        self,
+        *data_ids: str,
+        **preload_params: Any,
+    ) -> PreloadHandle:
+        """Preload the given data items for faster access.
+
+        Warning: This is an experimental and potentially unstable API
+        introduced in xcube 1.8.
+
+        The method may be blocking or non-blocking.
+        Implementations may offer the following keyword arguments
+        in *preload_params*:
+
+        - ``blocking``: whether the preload process is blocking.
+          Should be `True` by default if supported.
+        - ``monitor``: a callback function that serves as a progress monitor.
+          It receives the preload handle and the recent partial state update.
+
+        Args:
+            data_ids: Data identifiers to be preloaded.
+            preload_params: data store specific preload parameters.
+              See method ``get_preload_data_params_schema()`` for information
+              on the possible options.
+
+        Returns:
+            A handle for the preload process. The default implementation
+            returns an empty preload handle.
+        """
+
+    # noinspection PyMethodMayBeStatic
+    @abstractmethod
+    def get_preload_data_params_schema(self) -> JsonObjectSchema:
+        """Get the JSON schema that describes the keyword
+        arguments that can be passed to ``preload_data()``.
+
+        Returns:
+            A ``JsonObjectSchema`` object whose properties describe
+            the parameters of ``preload_data()``.
         """
 
 

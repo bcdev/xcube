@@ -868,7 +868,8 @@ class RectifyDatasetTest(SourceDatasetMixin, unittest.TestCase):
 
         target_rad = np.full((13, 13), np.nan, dtype=np.float64)
 
-        compute_var_image(source_ds.rad.values, dst_src_ij, target_rad, 0)
+        src_bbox = [0, 0, source_ds.rad.shape[-1], source_ds.rad.shape[-2]]
+        compute_var_image(source_ds.rad.values, dst_src_ij, target_rad, src_bbox, 0)
 
         if not is_j_axis_up:
             np.testing.assert_almost_equal(
@@ -975,7 +976,9 @@ class RectifySentinel2DatasetTest(SourceDatasetMixin, unittest.TestCase):
             ]
         )
 
-        source_gm = GridMapping.from_dataset(source_ds, prefer_crs=CRS_WGS84)
+        source_gm = GridMapping.from_dataset(
+            source_ds, prefer_crs=CRS_WGS84, tolerance=1e-6
+        )
 
         target_ds = rectify_dataset(source_ds, source_gm=source_gm)
         self.assertEqual(((5, 1), (5, 4)), target_ds.rrs_665.chunks)

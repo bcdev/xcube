@@ -312,7 +312,7 @@ class GridMappingTest(SourceDatasetMixin, unittest.TestCase):
         self.assertEqual(pyproj.CRS.from_string("EPSG:32633"), transformed_gm.crs)
         self.assertEqual((400, 200), transformed_gm.size)
         self.assertEqual((400, 200), transformed_gm.tile_size)
-        self.assertEqual(None, transformed_gm.is_j_axis_up)
+        self.assertEqual(False, transformed_gm.is_j_axis_up)
         self.assertEqual(
             ("transformed_x", "transformed_y"), transformed_gm.xy_var_names
         )
@@ -335,7 +335,7 @@ class GridMappingTest(SourceDatasetMixin, unittest.TestCase):
         self.assertEqual((400, 200), transformed_gm.size)
         self.assertEqual((200, 200), transformed_gm.tile_size)
         self.assertEqual((1000, 1000), transformed_gm.xy_res)
-        self.assertEqual(None, transformed_gm.is_j_axis_up)
+        self.assertEqual(False, transformed_gm.is_j_axis_up)
         self.assertEqual(
             ("transformed_x", "transformed_y"), transformed_gm.xy_var_names
         )

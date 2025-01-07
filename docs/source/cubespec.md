@@ -1,6 +1,6 @@
 # xcube Dataset Convention
 
-_Version 1.0 Draft, last updated April 28, 2023_
+_Version 1.1, last updated Dec 16, 2024_
 
 ## Introduction
 
@@ -31,6 +31,7 @@ _may_ is optional and recommended in cases (like good to have).
 - [Encoding of Flags](#encoding-of-flags)
 - [Encoding of Missing Values](#encoding-of-missing-values)
 - [Encoding of Scale/Offset Values](#encoding-of-scale-offset-values)
+- [Encoding of Colors](#encoding-of-colors)
 - [Multi-Resolution Datasets](#multi-resolution-datasets)
 - [Multi-Band Datasets](#multi-band-datasets)
 - [Metadata Consolidation](#metadata-consolidation)
@@ -106,7 +107,10 @@ Datasets that use a non-geographic grid must provide the 1-D coordinates
 
 * In case the grid refers to a known spatial reference system (projected CRS), 
   the dataset must make use of the CRS encoding described in the 
-  [CF Conventions on Grid Mapping], i.e. add a variable `crs`.
+  [CF Conventions on Grid Mapping]. The CRS is encoded in the attributes of a 
+  special 0-D variable. It is suggested to call that variable `spatial_ref` 
+  for compatibility with `rasterio`. However, the name `crs` is also 
+  frequently used.
 * In case the grid is referring to satellite viewing geometry, the dataset must provide 
   2-D coordinates `lat` and `lon` both having the dimensions `y`, `x` – 
   in exactly this order, and apply the [CF Conventions on 2-D Lat and Lon].
@@ -189,10 +193,30 @@ if provided as value range for mapping color bars.
 ## Encoding of Scale/Offset Values
 
 Scale and offset encoding of bands / variables follows the 
-[CF Convention on Packed Data]. In practice, affected variables must have 
-attributes `scaling_factor` (default is 1) and `add_offset` (with default 0).  
+[CF Convention on Packed Data]. In practice, affected variables must define 
+the attributes `scaling_factor` (default is 1) and/or `add_offset` 
+(with default 0).  
 
 [CF Convention on Packed Data]: https://cfconventions.org/Data/cf-conventions/cf-conventions-1.8/cf-conventions.html#packed-data
+
+## Encoding of Colors
+
+To allow encoding the values of bands/ data variables using color
+for creating images, related variables may define the attributes
+
+- `color_value_min`: The minimum value of the variable data range that is 
+  mapped to a color. 
+- `color_value_max`: The maximum value of the variable data range that is 
+  mapped to a color.
+- `color_norm`: The normalisation method to be applied to the variable data
+  before the color mapping takes place. The value `lin` refers to a linear 
+  mapping of a minimum and maximum to range [0, 1] which is the default. 
+  The value `log` refers to a logarithmic mapping within the range. 
+- `color_bar_name` a color bar name, see [matplotlib color maps] for the 
+  possible names. Other names may be used depending on the context in 
+  which variables are encoded as images.
+
+[matplotlib color maps]: https://matplotlib.org/stable/users/explain/colors/colormaps.html
 
 ## Multi-Resolution Datasets
 

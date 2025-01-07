@@ -35,7 +35,7 @@ class GeoTIFFMultiLevelDataset(LazyMultiLevelDataset):
         fs: fsspec.AbstractFileSystem,
         root: Optional[str],
         data_id: str,
-        **open_params: dict[str, Any]
+        **open_params: dict[str, Any],
     ):
         super().__init__(ds_id=data_id)
         self._fs = fs

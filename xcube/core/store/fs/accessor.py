@@ -133,9 +133,9 @@ class FsAccessor:
         for the parameter "storage_options" to given *param_schema*.
         """
         params_schema = copy.deepcopy(params_schema)
-        params_schema.properties[
-            STORAGE_OPTIONS_PARAM_NAME
-        ] = cls.get_storage_options_schema()
+        params_schema.properties[STORAGE_OPTIONS_PARAM_NAME] = (
+            cls.get_storage_options_schema()
+        )
         return params_schema
 
     @classmethod

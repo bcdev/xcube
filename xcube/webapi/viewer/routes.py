@@ -124,7 +124,8 @@ class ViewerStateHandler(ApiHandler[ViewerContext]):
     )
     def get(self):
         if self.ctx.persistence is None:
-            self.response.set_status(504, "Persistence not supported")
+            # 501: Not Implemented
+            self.response.set_status(501, "Persistence not supported")
             return
         key = self.request.get_query_arg("key", type=str, default="")
         if key:
@@ -144,7 +145,8 @@ class ViewerStateHandler(ApiHandler[ViewerContext]):
     )
     def put(self):
         if self.ctx.persistence is None:
-            self.response.set_status(504, "Persistence not supported")
+            # 501: Not Implemented
+            self.response.set_status(501, "Persistence not supported")
             return
         state = self.request.body
         key = self.new_key()

@@ -33,12 +33,12 @@ class ViewerStateRoutesNoConfigTest(RoutesTestCase):
 
     def test_get(self):
         response = self.fetch("/viewer/state")
-        self.assertEqual(504, response.status)
+        self.assertEqual(501, response.status)
         self.assertEqual("Persistence not supported", response.reason)
 
     def test_put(self):
         response = self.fetch("/viewer/state", method="PUT", body={"state": 123})
-        self.assertEqual(504, response.status)
+        self.assertEqual(501, response.status)
         self.assertEqual("Persistence not supported", response.reason)
 
 

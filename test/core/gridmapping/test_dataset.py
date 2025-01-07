@@ -85,7 +85,7 @@ class DatasetGridMappingTest(unittest.TestCase):
         self.assertEqual(GEO_CRS, gm.crs)
         self.assertEqual(False, gm.is_regular)
         self.assertEqual(False, gm.is_lon_360)
-        self.assertEqual(None, gm.is_j_axis_up)
+        self.assertEqual(False, gm.is_j_axis_up)
         self.assertEqual((2, 3, 4), gm.xy_coords.shape)
         self.assertEqual(("coord", "y", "x"), gm.xy_coords.dims)
         self.assertEqual((0.8, 0.8), gm.xy_res)
@@ -114,7 +114,7 @@ class DatasetGridMappingTest(unittest.TestCase):
         # self.assertAlmostEqual(60.63871982169044, gm.y_max)
         self.assertEqual(False, gm.is_regular)
         self.assertEqual(False, gm.is_lon_360)
-        self.assertEqual(None, gm.is_j_axis_up)
+        self.assertEqual(False, gm.is_j_axis_up)
         self.assertEqual((2, 1890, 1189), gm.xy_coords.shape)
         self.assertEqual(("coord", "y", "x"), gm.xy_coords.dims)
 
@@ -123,29 +123,30 @@ class DatasetGridMappingTest(unittest.TestCase):
 
     def test_from_sentinel_2(self):
         dataset = create_s2plus_dataset()
+        tol = 1e-6
 
-        gm = GridMapping.from_dataset(dataset)
+        gm = GridMapping.from_dataset(dataset, tolerance=tol)
         # Should pick the projected one which is regular
         self.assertIn("Projected", gm.crs.type_name)
         self.assertEqual(True, gm.is_regular)
 
-        gm = GridMapping.from_dataset(dataset, prefer_is_regular=True)
+        gm = GridMapping.from_dataset(dataset, prefer_is_regular=True, tolerance=tol)
         # Should pick the projected one which is regular
         self.assertIn("Projected", gm.crs.type_name)
         self.assertEqual(True, gm.is_regular)
 
-        gm = GridMapping.from_dataset(dataset, prefer_is_regular=False)
+        gm = GridMapping.from_dataset(dataset, prefer_is_regular=False, tolerance=tol)
         # Should pick the geographic one which is irregular
         self.assertIn("Geographic", gm.crs.type_name)
         self.assertEqual(False, gm.is_regular)
 
-        gm = GridMapping.from_dataset(dataset, prefer_crs=GEO_CRS)
+        gm = GridMapping.from_dataset(dataset, prefer_crs=GEO_CRS, tolerance=tol)
         # Should pick the geographic one which is irregular
         self.assertIn("Geographic", gm.crs.type_name)
         self.assertEqual(False, gm.is_regular)
 
         gm = GridMapping.from_dataset(
-            dataset, prefer_crs=GEO_CRS, prefer_is_regular=True
+            dataset, prefer_crs=GEO_CRS, prefer_is_regular=True, tolerance=tol
         )
         # Should pick the geographic one which is irregular
         self.assertIn("Geographic", gm.crs.type_name)

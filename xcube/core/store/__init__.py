@@ -4,6 +4,7 @@
 
 from .accessor import DataDeleter
 from .accessor import DataOpener
+from .accessor import DataPreloader
 from .accessor import DataTimeSliceUpdater
 from .accessor import DataWriter
 from .accessor import find_data_opener_extensions
@@ -27,6 +28,9 @@ from .descriptor import VariableDescriptor
 from .descriptor import new_data_descriptor
 from .error import DataStoreError
 from .fs.registry import new_fs_data_store
+from .preload import PreloadHandle
+from .preload import PreloadState
+from .preload import PreloadStatus
 from .search import DataSearcher
 from .search import DefaultSearchMixin
 from .store import DataStore

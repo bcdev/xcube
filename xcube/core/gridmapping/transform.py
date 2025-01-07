@@ -2,7 +2,7 @@
 # Permissions are hereby granted under the terms of the MIT License:
 # https://opensource.org/licenses/MIT.
 
-from typing import Union, Tuple
+from typing import Union
 
 import numpy as np
 import pyproj
@@ -13,6 +13,7 @@ from .base import DEFAULT_TOLERANCE
 from .base import GridMapping
 from .coords import new_grid_mapping_from_coords
 from .helpers import _assert_valid_xy_names
+from .helpers import _normalize_number_pair
 from .helpers import Number
 from .helpers import _normalize_crs
 
@@ -70,6 +71,47 @@ def transform_grid_mapping(
         output_dtypes=[np.float64],
         dask="parallelized",
     )
+    if xy_res is not None:
+        if grid_mapping.is_j_axis_up:
+            gm_ymin = grid_mapping.y_coords[0].values
+            gm_ymax = grid_mapping.y_coords[-1].values
+        else:
+            gm_ymin = grid_mapping.y_coords[-1].values
+            gm_ymax = grid_mapping.y_coords[0].values
+        y_min = np.min(
+            transformer.transform(
+                grid_mapping.x_coords.values,
+                np.repeat(gm_ymin, grid_mapping.size[0]),
+            )[1]
+        )
+        y_max = np.max(
+            transformer.transform(
+                grid_mapping.x_coords.values,
+                np.repeat(gm_ymax, grid_mapping.size[0]),
+            )[1]
+        )
+        x_min = np.min(
+            transformer.transform(
+                np.repeat(grid_mapping.x_coords[0].values, grid_mapping.size[1]),
+                grid_mapping.y_coords.values,
+            )[0]
+        )
+        x_max = np.max(
+            transformer.transform(
+                np.repeat(grid_mapping.x_coords[-1].values, grid_mapping.size[1]),
+                grid_mapping.y_coords.values,
+            )[0]
+        )
+        x_res, y_res = _normalize_number_pair(xy_res)
+        x_res_05, y_res_05 = x_res / 2, y_res / 2
+        xy_bbox = (
+            x_min - x_res_05,
+            y_min - y_res_05,
+            x_max + x_res_05,
+            y_max + y_res_05,
+        )
+    else:
+        xy_bbox = None
 
     xy_var_names = xy_var_names or ("transformed_x", "transformed_y")
 
@@ -90,6 +132,7 @@ def transform_grid_mapping(
         y_coords=xy_coords[1].rename(xy_var_names[1]),
         crs=target_crs,
         xy_res=xy_res,
+        xy_bbox=xy_bbox,
         tile_size=tile_size,
         tolerance=tolerance,
     )

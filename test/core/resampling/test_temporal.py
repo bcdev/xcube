@@ -92,12 +92,44 @@ class ResampleInTimeTest(unittest.TestCase):
         self.assertEqual((1, 90, 180), schema.chunks)
 
     def test_resample_in_time_p90_dask(self):
-        # "percentile_<p>" can currently only be used with numpy rather than chunked dask arrays:
+        resampled_cube = resample_in_time(self.input_cube, "2W", "percentile_90")
+        self.assertIsNot(resampled_cube, self.input_cube)
+        self.assertIn('time', resampled_cube)
+        self.assertIn('temperature_p90', resampled_cube)
+        self.assertIn('precipitation_p90', resampled_cube)
+        self.assertEqual(('time',), resampled_cube.time.dims)
+        self.assertEqual(('time', 'lat', 'lon'), resampled_cube.temperature_p90.dims)
+        self.assertEqual(('time', 'lat', 'lon'), resampled_cube.precipitation_p90.dims)
+        self.assertEqual((6,), resampled_cube.time.shape)
+        self.assertEqual((6, 180, 360), resampled_cube.temperature_p90.shape)
+        self.assertEqual((6, 180, 360), resampled_cube.precipitation_p90.shape)
+        np.testing.assert_equal(
+            resampled_cube.time.values,
+            np.array([
+                '2017-06-25T00:00:00Z',
+                '2017-07-09T00:00:00Z',
+                '2017-07-23T00:00:00Z',
+                '2017-08-06T00:00:00Z',
+                '2017-08-20T00:00:00Z',
+                '2017-09-03T00:00:00Z'
+            ],
+            dtype=np.datetime64
+            )
+        )
+        np.testing.assert_allclose(
+            resampled_cube.temperature_p90.values[..., 0, 0],
+            np.array([272.27, 272.85, 273.63, 274.25, 274.76, 274.9])
+        )
+        np.testing.assert_allclose(
+            resampled_cube.precipitation_p90.values[..., 0, 0],
+            np.array([119.94, 119.1, 117.86, 116.3, 115.12, 114.2])
+        )
+        schema = CubeSchema.new(resampled_cube)
+        self.assertEqual(3, schema.ndim)
+        self.assertEqual(('time', 'lat', 'lon'), schema.dims)
+        self.assertEqual((6, 180, 360), schema.shape)
+        self.assertEqual((1, 90, 180), schema.chunks)
 
-        # TypeError raised on Windows, ValueError on Linux
-        with self.assertRaises(Exception):
-            # noinspection PyUnusedLocal
-            resampled_cube = resample_in_time(self.input_cube, "2W", "percentile_90")
 
     # TODO (forman): the call to resample_in_time() takes forever,
     #                this is not xcube, but may be an issue in dask 0.14 or dask 2.8.

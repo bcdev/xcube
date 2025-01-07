@@ -47,7 +47,7 @@ def rectify_dataset(
 
     For example, a dataset may comprise variables with
     spatial dimensions ``var(..., y_dim, x_dim)``,
-    then one the function expects coordinates to be provided
+    then the function expects coordinates to be provided
     in two forms:
 
     1. One-dimensional ``x_var(x_dim)``
@@ -55,7 +55,7 @@ def rectify_dataset(
     2. Two-dimensional ``x_var(y_dim, x_dim)``
        and ``y_var(y_dim, x_dim)`` (coordinate) variables.
 
-    If *target_gm* is given and it defines a tile size,
+    If *target_gm* is given, and it defines a tile size,
     or *tile_size* is given and the number of tiles is
     greater than one in the output's x- or y-direction, then the
     returned dataset will be composed of lazy, chunked dask
@@ -602,22 +602,39 @@ def _compute_var_image_xarray_numpy(
 
 def _compute_var_image_xarray_dask(
     src_var: xr.DataArray,
-    dst_src_ij_images: np.ndarray,
+    dst_src_ij_images: da.Array,
     fill_value: Union[int, float, complex] = np.nan,
     interpolation: int = 0,
 ) -> da.Array:
     """Extract source pixels from xarray.DataArray source
     with dask.array.Array data.
     """
-    return da.map_blocks(
+    # If the source variable is not 3D, dummy variables are added to ensure
+    # that `_compute_var_image_xarray_dask_block` always operates on 3D chunks
+    # when processing each Dask chunk.
+    if src_var.ndim == 1:
+        src_var = src_var.expand_dims(dim={"dummy0": 1, "dummy1": 1})
+    if src_var.ndim == 2:
+        src_var = src_var.expand_dims(dim={"dummy": 1})
+    # Retrieve the chunk size required for `da.map_blocks`, as the resulting array
+    # will have a different shape.
+    chunksize = src_var.shape[:-2] + dst_src_ij_images.chunksize[-2:]
+    arr = da.map_blocks(
         _compute_var_image_xarray_dask_block,
-        src_var.values,
         dst_src_ij_images,
+        src_var,
         fill_value,
         interpolation,
+        chunksize,
         dtype=src_var.dtype,
-        drop_axis=0,
+        chunks=chunksize,
     )
+    arr = arr[..., : dst_src_ij_images.shape[-2], : dst_src_ij_images.shape[-1]]
+    if arr.shape[0] == 1:
+        arr = arr[0, :, :]
+    if arr.shape[0] == 1:
+        arr = arr[0, :]
+    return arr
 
 
 @nb.njit(nogil=True, cache=True)
@@ -634,18 +651,19 @@ def _compute_var_image_numpy(
     dst_height = dst_src_ij_images.shape[-2]
     dst_shape = src_var.shape[:-2] + (dst_height, dst_width)
     dst_values = np.full(dst_shape, fill_value, dtype=src_var.dtype)
+    src_bbox = (0, 0, src_var.shape[-2], src_var.shape[-1])
     _compute_var_image_numpy_parallel(
-        src_var, dst_src_ij_images, dst_values, interpolation
+        src_var, dst_src_ij_images, dst_values, src_bbox, interpolation
     )
     return dst_values
 
 
-@nb.njit(nogil=True, cache=True)
 def _compute_var_image_xarray_dask_block(
-    src_var_image: np.ndarray,
     dst_src_ij_images: np.ndarray,
+    src_var_image: xr.DataArray,
     fill_value: Union[int, float, complex],
     interpolation: int,
+    chunksize: tuple[int],
 ) -> np.ndarray:
     """Extract source pixels from np.ndarray source
     and return a block of a dask array.
@@ -653,11 +671,24 @@ def _compute_var_image_xarray_dask_block(
     dst_width = dst_src_ij_images.shape[-1]
     dst_height = dst_src_ij_images.shape[-2]
     dst_shape = src_var_image.shape[:-2] + (dst_height, dst_width)
+    dst_out = np.full(chunksize, fill_value, dtype=src_var_image.dtype)
+    if np.all(np.isnan(dst_src_ij_images[0])):
+        return dst_out
     dst_values = np.full(dst_shape, fill_value, dtype=src_var_image.dtype)
-    _compute_var_image_numpy_sequential(
-        src_var_image, dst_src_ij_images, dst_values, interpolation
+    src_bbox = (
+        int(np.nanmin(dst_src_ij_images[0])),
+        int(np.nanmin(dst_src_ij_images[1])),
+        min(int(np.nanmax(dst_src_ij_images[0])) + 2, src_var_image.shape[-1]),
+        min(int(np.nanmax(dst_src_ij_images[1])) + 2, src_var_image.shape[-2]),
     )
-    return dst_values
+    src_var_image = src_var_image[
+        ..., src_bbox[1] : src_bbox[3], src_bbox[0] : src_bbox[2]
+    ].values.astype(np.float64)
+    _compute_var_image_numpy_sequential(
+        src_var_image, dst_src_ij_images, dst_values, src_bbox, interpolation
+    )
+    dst_out[..., :dst_height, :dst_width] = dst_values
+    return dst_out
 
 
 @nb.njit(nogil=True, parallel=True, cache=True)
@@ -665,6 +696,7 @@ def _compute_var_image_numpy_parallel(
     src_var_image: np.ndarray,
     dst_src_ij_images: np.ndarray,
     dst_var_image: np.ndarray,
+    src_bbox: tuple[int, int, int, int],
     interpolation: int,
 ):
     """Extract source pixels from np.ndarray source
@@ -677,6 +709,7 @@ def _compute_var_image_numpy_parallel(
             src_var_image,
             dst_src_ij_images,
             dst_var_image,
+            src_bbox,
             interpolation,
         )
 
@@ -688,6 +721,7 @@ def _compute_var_image_numpy_sequential(
     src_var_image: np.ndarray,
     dst_src_ij_images: np.ndarray,
     dst_var_image: np.ndarray,
+    src_bbox: tuple[int, int, int, int],
     interpolation: int,
 ):
     """Extract source pixels from np.ndarray source
@@ -696,7 +730,12 @@ def _compute_var_image_numpy_sequential(
     dst_height = dst_var_image.shape[-2]
     for dst_j in range(dst_height):
         _compute_var_image_for_dest_line(
-            dst_j, src_var_image, dst_src_ij_images, dst_var_image, interpolation
+            dst_j,
+            src_var_image,
+            dst_src_ij_images,
+            dst_var_image,
+            src_bbox,
+            interpolation,
         )
 
 
@@ -706,6 +745,7 @@ def _compute_var_image_for_dest_line(
     src_var_image: np.ndarray,
     dst_src_ij_images: np.ndarray,
     dst_var_image: np.ndarray,
+    src_bbox: tuple[int, int, int, int],
     interpolation: int,
 ):
     """Extract source pixels from *src_values* np.ndarray
@@ -719,8 +759,8 @@ def _compute_var_image_for_dest_line(
     src_i_max = src_width - 1
     src_j_max = src_height - 1
     for dst_i in range(dst_width):
-        src_i_f = dst_src_ij_images[0, dst_j, dst_i]
-        src_j_f = dst_src_ij_images[1, dst_j, dst_i]
+        src_i_f = dst_src_ij_images[0, dst_j, dst_i] - src_bbox[0]
+        src_j_f = dst_src_ij_images[1, dst_j, dst_i] - src_bbox[1]
         if np.isnan(src_i_f) or np.isnan(src_j_f):
             continue
         # Note int() is 2x faster than math.floor() and

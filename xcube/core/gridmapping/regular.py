@@ -55,7 +55,9 @@ class RegularGridMapping(GridMapping):
         xy_coords = da.concatenate(
             [da.expand_dims(x_coords_2d, 0), da.expand_dims(y_coords_2d, 0)]
         )
-        xy_coords = da.rechunk(xy_coords, chunks=(2, 512, 512))
+        xy_coords = da.rechunk(
+            xy_coords, chunks=(2, xy_coords.chunksize[1], xy_coords.chunksize[2])
+        )
         xy_coords = xr.DataArray(
             xy_coords,
             dims=("coord", self.y_coords.dims[0], self.x_coords.dims[0]),
