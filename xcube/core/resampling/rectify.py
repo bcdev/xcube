@@ -138,18 +138,7 @@ def rectify_dataset(
         if source_ds_subset is None:
             return None
         if source_ds_subset is not source_ds:
-            # Handles the case where 2D coordinates are already present in the dataset,
-            # which typically occurs after a reprojection performed by the
-            # `resample_in_space` function.
-            if "transformed_x" and "transformed_y" in source_ds_subset:
-                source_gm = GridMapping.from_coords(
-                    source_ds_subset.transformed_x,
-                    source_ds_subset.transformed_y,
-                    crs=source_gm.crs,
-                    tile_size=source_gm.tile_size,
-                )
-            else:
-                source_gm = GridMapping.from_dataset(source_ds_subset)
+            source_gm = GridMapping.from_dataset(source_ds_subset)
             source_ds = source_ds_subset
 
     if tile_size is not None or is_j_axis_up is not None:
