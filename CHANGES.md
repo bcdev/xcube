@@ -55,6 +55,9 @@
 
 ### Fixes
 
+* The function `xcube.core.resample.resample_in_space()` now supports the parameter
+  `source_ds_subset=True` when calling `rectify_dataset`. This feature enables
+  performing the reprojection exclusively on the congruent subset of the dataset.
 * The function `xcube.core.resample.resample_in_space()` now always operates
   lazily and therefore supports chunk-wise, parallel processing. (#1082)
 * Bux fix in the `has_data` method of the `"https"` data store
