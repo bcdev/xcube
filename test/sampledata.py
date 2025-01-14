@@ -376,7 +376,11 @@ class SourceDatasetMixin:
         spatial_ref = np.array(0)
         band_1 = np.arange(25).reshape((5, 5))
         ds = xr.Dataset(
-            dict(band_1=xr.DataArray(band_1, dims=("y", "x"))),
+            dict(
+                band_1=xr.DataArray(
+                    band_1, dims=("y", "x"), attrs=dict(grid_mapping="spatial_ref")
+                )
+            ),
             coords=dict(x=x, y=y, spatial_ref=spatial_ref),
         )
         ds.spatial_ref.attrs = pyproj.CRS.from_epsg("32632").to_cf()
