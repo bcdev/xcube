@@ -213,9 +213,12 @@ def resample_in_space(
         source_ds = source_ds.drop_vars("crs")
     if "spatial_ref" in source_ds:
         source_ds = source_ds.drop_vars("spatial_ref")
+    source_ds = source_ds.copy()
     for var in source_ds.data_vars:
         if "grid_mapping" in source_ds[var].attrs:
-            del source_ds[var].attrs["grid_mapping"]
+            attrs = source_ds[var].attrs
+            del attrs["grid_mapping"]
+            source_ds[var] = source_ds[var].assign_attrs(attrs)
     transformed_x, transformed_y = transformed_source_gm.xy_coords
     attrs = dict(grid_mapping="spatial_ref")
     transformed_x.attrs = attrs
