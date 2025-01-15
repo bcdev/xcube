@@ -89,7 +89,46 @@ class ResampleInSpaceTest(SourceDatasetMixin, unittest.TestCase):
     def test_reproject_utm(self):
         source_ds = self.new_5x5_dataset_regular_utm()
 
-        # similar resolution
+        # test projected CRS similar resolution
+        target_gm = GridMapping.regular(
+            size=(5, 5), xy_min=(4320080, 3382480), xy_res=80, crs="epsg:3035"
+        )
+        target_ds = resample_in_space(source_ds, target_gm=target_gm)
+        np.testing.assert_almost_equal(
+            target_ds.band_1.values,
+            np.array(
+                [
+                    [1, 1, 2, 3, 4],
+                    [6, 6, 7, 8, 9],
+                    [11, 12, 12, 13, 14],
+                    [16, 17, 17, 18, 19],
+                    [21, 17, 17, 18, 19],
+                ],
+                dtype=target_ds.band_1.dtype,
+            ),
+        )
+
+        # test projected CRS finer resolution
+        # test if subset calculation works as expected
+        target_gm = GridMapping.regular(
+            size=(5, 5), xy_min=(4320080, 3382480), xy_res=20, crs="epsg:3035"
+        )
+        target_ds = resample_in_space(source_ds, target_gm=target_gm)
+        np.testing.assert_almost_equal(
+            target_ds.band_1.values,
+            np.array(
+                [
+                    [15, 16, 16, 16, 16],
+                    [15, 16, 16, 16, 16],
+                    [15, 16, 16, 16, 16],
+                    [20, 21, 21, 21, 21],
+                    [20, 21, 21, 21, 21],
+                ],
+                dtype=target_ds.band_1.dtype,
+            ),
+        )
+
+        # test geographic CRS with similar resolution
         target_gm = GridMapping.regular(
             size=(5, 5), xy_min=(9.9886, 53.5499), xy_res=0.0006, crs=CRS_WGS84
         )
@@ -108,7 +147,8 @@ class ResampleInSpaceTest(SourceDatasetMixin, unittest.TestCase):
             ),
         )
 
-        # 1/2 resolution, test if subset calculation works as expected
+        # test geographic CRS with 1/2 resolution
+        # test if subset calculation works as expected
         target_gm = GridMapping.regular(
             size=(5, 5), xy_min=(9.9886, 53.5499), xy_res=0.0003, crs=CRS_WGS84
         )
@@ -122,25 +162,6 @@ class ResampleInSpaceTest(SourceDatasetMixin, unittest.TestCase):
                     [17, 17, 17, 18, 18],
                     [22, 17, 17, 18, 18],
                     [22, 22, 22, 23, 23],
-                ],
-                dtype=target_ds.band_1.dtype,
-            ),
-        )
-
-        # test projected CRS
-        target_gm = GridMapping.regular(
-            size=(5, 5), xy_min=(4320080, 3382480), xy_res=80, crs="epsg:3035"
-        )
-        target_ds = resample_in_space(source_ds, target_gm=target_gm)
-        np.testing.assert_almost_equal(
-            target_ds.band_1.values,
-            np.array(
-                [
-                    [1, 1, 2, 3, 4],
-                    [6, 6, 7, 8, 9],
-                    [11, 12, 12, 13, 14],
-                    [16, 17, 17, 18, 19],
-                    [21, 17, 17, 18, 19],
                 ],
                 dtype=target_ds.band_1.dtype,
             ),
