@@ -208,11 +208,44 @@ def resample_in_space(
     # If CRSes are not both geographic and their CRSes are different
     # transform the source_gm so its CRS matches the target CRS:
     transformed_source_gm = source_gm.transform(target_gm.crs, xy_res=target_gm.xy_res)
+    # source_ds = source_ds.drop_vars(source_gm.xy_dim_names)
+    # if "crs" in source_ds:
+    #     source_ds = source_ds.drop_vars("crs")
+    # if "spatial_ref" in source_ds:
+    #     source_ds = source_ds.drop_vars("spatial_ref")
+    # source_ds = source_ds.copy()
+    # for var in source_ds.data_vars:
+    #     if "grid_mapping" in source_ds[var].attrs:
+    #         attrs = source_ds[var].attrs
+    #         del attrs["grid_mapping"]
+    #         source_ds[var] = source_ds[var].assign_attrs(attrs)
+    # transformed_x, transformed_y = transformed_source_gm.xy_coords
+    # attrs = dict(grid_mapping="spatial_ref")
+    # transformed_x.attrs = attrs
+    # transformed_y.attrs = attrs
+    # source_ds = source_ds.assign_coords(
+    #     spatial_ref=xr.DataArray(0, attrs=transformed_source_gm.crs.to_cf()),
+    #     transformed_x=transformed_x,
+    #     transformed_y=transformed_y,
+    # )
     transformed_x, transformed_y = transformed_source_gm.xy_coords
+    attrs = dict(grid_mapping="transformed_spatial_ref")
+    transformed_x.attrs = attrs
+    transformed_y.attrs = attrs
+    source_ds = source_ds.assign_coords(
+        transformed_spatial_ref=xr.DataArray(
+            0, attrs=transformed_source_gm.crs.to_cf()
+        ),
+        transformed_x=transformed_x,
+        transformed_y=transformed_y,
+    )
     return resample_in_space(
-        source_ds.assign(transformed_x=transformed_x, transformed_y=transformed_y),
+        source_ds,
         source_gm=transformed_source_gm,
         ref_ds=ref_ds,
         target_gm=target_gm,
+        var_configs=var_configs,
+        encode_cf=encode_cf,
         gm_name=gm_name,
+        rectify_kwargs=rectify_kwargs,
     )
